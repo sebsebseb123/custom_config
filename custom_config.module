@@ -1,0 +1,389 @@
+<?php
+
+/**
+ * @file
+ * Utility module for storing custom config pages and other settings.
+ */
+
+/**
+ * Project machine name.
+ */
+define('PROJECT_NAME', 'changeme');
+
+/**
+ * Project label.
+ */
+define('PROJECT_LABEL', 'Change Me');
+
+/**
+ * Config admin path.
+ */
+define('CUSTOM_CONFIG_ADMIN_PATH', 'admin/config/custom');
+
+
+/**
+ * Implements hook_menu().
+ */
+function custom_config_menu() {
+  $items = array();
+
+  $items[CUSTOM_CONFIG_ADMIN_PATH] = array(
+    'title' => PROJECT_LABEL,
+    'page callback' => 'custom_config_admin_page',
+    'access arguments' => array('access custom config'),
+    'file' => 'custom_config.admin.inc',
+  );
+  $items[CUSTOM_CONFIG_ADMIN_PATH . '/info'] = array(
+    'title' => PROJECT_LABEL . ' - Info',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items[CUSTOM_CONFIG_ADMIN_PATH . '/run-install-hooks'] = array(
+    'title' => 'Run Install Hooks',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'custom_config_install_callback',
+    'access arguments' => array('access custom config'),
+    'file' => 'custom_config.admin.inc',
+  );
+  $items[CUSTOM_CONFIG_ADMIN_PATH . '/run-post-install'] = array(
+    'title' => 'Run Post Install',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'custom_config_postinstall_callback',
+    'access arguments' => array('access custom config'),
+    'file' => 'custom_config.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function custom_config_permission() {
+  $permissions = array(
+    'access custom config' => array(
+      'title' => t('Access Custom Config'),
+    ),
+  );
+  return $permissions;
+}
+
+/**
+ * Implements hook_init().
+ *
+ * We use this instead of an install hook because we need to do some
+ * actions after the entire site is fully built.
+ */
+function custom_config_init() {
+  // If this is the very first page hit... we need to do stuff.
+  // TODO: Would be nice to have a supplementary module which turns itself
+  // off after the first init. For the sole purpose of this type of install
+  // functionality. That way, hook_init isn't called every time.
+  if (variable_get('custom_config_ran', FALSE)) {
+    return;
+  }
+
+  // Set var, so that this hook will never run.
+  variable_set('custom_config_ran', TRUE);
+
+  // Call function to run post install routines.
+  module_load_include('inc', 'custom_config', 'custom_config.admin');
+  custom_config_postinstall_callback();
+}
+
+/**
+ * Fire the install hooks of our custom and feature modules.
+ */
+function custom_config_run_install_hooks() {
+  // Up the time limit here, just in case. Although, the batch API is a better
+  // option for the long run.
+  // TODO: Use batch API instead of upping time limit.
+  drupal_set_time_limit(120);
+
+  // Run our install hooks.
+  foreach (custom_config_module_implements('install') as $module) {
+    // The "install" hook is a bit funny because the .install file might
+    // not be loaded yet. So, we need to manually load the file, then run
+    // the hook.
+    if (module_exists($module) && module_load_install($module)) {
+      module_invoke($module, 'install');
+    }
+  }
+
+  // Set status message.
+  drupal_set_message(t('Install hooks ran.'));
+}
+
+/**
+ * Calls the post install hooks for our modules.
+ */
+function custom_config_run_postinstall_hooks() {
+  // Create any blocks that we need to.
+  $modules = custom_config_module_implements('install_blocks');
+  foreach ($modules as $module) {
+    $blocks = module_invoke($module, 'install_blocks');
+    if (is_array($blocks)) {
+      custom_config_create_blocks($blocks);
+    }
+  }
+
+  // Create terms.
+  $modules = custom_config_module_implements('install_terms');
+  foreach ($modules as $module) {
+    $term_sets = module_invoke($module, 'install_terms');
+    if (!empty($term_sets) && is_array($term_sets)) {
+      foreach ($term_sets as $vocab_name => $terms) {
+        custom_config_create_terms($vocab_name, $terms);
+      }
+    }
+  }
+
+  // Run any install_postinstall hooks.
+  $modules = custom_config_module_implements('install_postinstall');
+  foreach ($modules as $module) {
+    module_invoke($module, 'install_postinstall');
+  }
+
+  // Run queries.
+  $modules = custom_config_module_implements('queries');
+  foreach ($modules as $module) {
+    $queries = module_invoke($module, 'queries');
+    if (!empty($queries) && is_array($queries)) {
+      foreach ($queries as $query) {
+        custom_config_try_query($query);
+      }
+    }
+  }
+
+  // Set status message.
+  drupal_set_message(t('Post install hooks ran.'));
+}
+
+/**
+ * Custom version of Drupal's module_implements().
+ *
+ * Our version only looks in custom or features subdirectories.
+ *
+ * @param string $hook
+ *   The hook to search for.
+ *
+ * @return array
+ *   Array of modules which implement the given hook.
+ */
+function custom_config_module_implements($hook) {
+  // Get all the modules, then check each one to see if it's in our
+  // custom or features folders.
+  if ($hook == 'install') {
+    $modules = module_list();
+  }
+  else {
+    $modules = module_implements($hook);
+  }
+
+  if (empty($modules)) {
+    // If we've got no modules, return a blank array.
+    return array();
+  }
+
+  // Start the query on the system table.
+  $query = db_select('system', 's')
+          ->fields('s', array('name'));
+  // If it's path is in custom or features... we want it.
+  $or = db_or()
+      ->condition('s.filename', '%modules/custom%', 'LIKE')
+      ->condition('s.filename', '%modules/features%', 'LIKE')
+      ->condition('s.filename', 'profiles/' . PROJECT_NAME . '/' . PROJECT_NAME . '.profile', 'LIKE');
+  $query->condition($or);
+  // Also if it's one of the modules that implement the hook.
+  $query->condition('s.name', $modules);
+  $result = $query->execute();
+
+  // Reset modules array, so we can populate it.
+  $modules = array();
+  while ($module = $result->fetchAssoc()) {
+    // Populate.
+    $modules[] = $module['name'];
+  }
+
+  return $modules;
+}
+
+/**
+ * Helper function to create blocks.
+ *
+ * First checks if they already exist. If not, then creates them by injecting
+ * into the DB.
+ *
+ * @param array $blocks
+ *   An array of block information. Each should contain a minimum
+ *   of 'module'.
+ */
+function custom_config_create_blocks($blocks) {
+  foreach ($blocks as $i => $block) {
+    // Add defaults.
+    $block += array(
+      'theme' => PROJECT_NAME,
+      'visibility' => 0,
+      'pages' => '',
+      'cache' => -1,
+      'status' => 1,
+      'weight' => -1,
+      'region' => '',
+      'delta' => 0,
+      'module' => 'block',
+    );
+
+    // Set $insert to TRUE by default.
+    $insert = TRUE;
+
+    // Check to see if the block already exists.
+    $result = db_select('block', 'b')
+      ->fields('b')
+      ->condition('module', $block['module'], '=')
+      ->condition('delta', $block['delta'], '=')
+      ->condition('theme', $block['theme'], '=')
+      ->execute()
+      ->fetchAssoc();
+    if (!empty($result['bid'])) {
+      $insert = FALSE;
+    }
+
+    // Write records.
+    if ($insert) {
+      $query = db_insert('block')
+        ->fields(array_keys($block))
+        ->values($block);
+      custom_config_try_query($query);
+    }
+    else {
+      $query = db_update('block')
+        ->fields($block)
+        ->condition('module', $block['module'], '=')
+        ->condition('delta', $block['delta'], '=')
+        ->condition('theme', $block['theme'], '=');
+      custom_config_try_query($query);
+    }
+  }
+}
+
+/**
+ * Function to safely run DB queries.
+ *
+ * If the query fails, an exception is thrown rather than crashing.
+ *
+ * @param object $query
+ *   An executable query object.
+ */
+function custom_config_try_query($query) {
+  // Declare transaction.
+  $transaction = db_transaction();
+
+  try {
+    // Execute.
+    $query->execute();
+  }
+  catch (Exception $e) {
+    // If it failed, rollback and throw an error.
+    $transaction->rollback();
+    watchdog_exception(PROJECT_NAME, $e);
+  }
+  // If we've gotten this far, then the query will be commited.
+}
+
+/**
+ * Create taxo terms for a specified vocab.
+ *
+ * @param string $vocab_name
+ *   The machine name of the vocabulary.
+ *
+ * @param array $terms
+ *   An array of taxo terms to create.
+ */
+function custom_config_create_terms($vocab_name, $terms) {
+  // Let's load the vocab.
+  if (!($vocab = taxonomy_vocabulary_machine_name_load($vocab_name))) {
+    return;
+  }
+
+  foreach ($terms as $term_name) {
+    // Try to find any matches for this term name.
+    $matches = taxonomy_get_term_by_name($term_name, $vocab->machine_name);
+
+    // If none, let's create it.
+    if (empty($matches)) {
+      // Add vocab ID and a default weight.
+      $term = array(
+        'name' => $term_name,
+        'vid' => $vocab->vid,
+        'weight' => 0,
+      );
+
+      // Make it an object.
+      $term = (object) $term;
+
+      // Save it.
+      taxonomy_term_save($term);
+    }
+  }
+}
+
+/**
+ * Safely install a module/feature's components.
+ *
+ * @param string $module
+ *   The module which needs to be installed.
+ */
+function custom_config_install_module($module) {
+  // During a module's installation... maybe we need to do things?
+}
+
+/**
+ * Enable modules, one at a time.
+ *
+ * We do this to gather better debug info and
+ * have a better chance at getting each module enabled.
+ * The way module_enable works, if one module doesn't meet all of it's
+ * dependencies, than none of them will be enabled. Not only that,
+ * it doesn't do a good job of letting you know what failed.
+ * This function should technically run much slower than simply
+ * doing module_enable($module_list) ... but, since we're the
+ * only ones calling it... go for it!
+ *
+ * @param array $module_list
+ *   The modules which needs to be installed.
+ *
+ * @return array
+ *   Array of enabled and not_enabled modules.
+ */
+function custom_config_module_enable($module_list) {
+  // Init results array.
+  $results = array(
+    'enabled' => array(),
+    'not_enabled' => array(),
+  );
+
+  // Let's go through each one and figure out what's going on
+  // and keep track of it.
+  foreach ($module_list as $module) {
+    if (module_enable(array($module))) {
+      $results['enabled'][] = $module;
+    }
+    else {
+      $results['not_enabled'][] = $module;
+    }
+  }
+
+  // Watchdog the info!
+  watchdog(PROJECT_NAME, 'The following modules were enabled: @enabled
+    <br /><br />
+    The following modules were not enabled because one or more dependencies
+    are missing for that module: @not_enabled',
+    array(
+      '@enabled' => implode(', ', $results['enabled']),
+      '@not_enabled' => implode(', ', $results['not_enabled']),
+    )
+  );
+
+  // Return the info.
+  return $results;
+}

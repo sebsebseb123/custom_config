@@ -1,0 +1,4 @@
+name = Custom config page and other settings.
+description = This is a utility module for developers and site admins.
+package = Custom
+core = 7.x
