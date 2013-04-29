@@ -335,6 +335,7 @@ function custom_config_create_terms($vocab_name, $terms) {
  */
 function custom_config_install_module($module) {
   // During a module's installation... maybe we need to do things?
+
 }
 
 /**
