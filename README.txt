@@ -13,15 +13,6 @@ This module works alongside the "installation profile" development strategy, and
   /profiles/project_name/modules/features
 
 
--- INSTALLATION --
-
-* Before using the module, you will need to modify a couple constants which can be found in the .module file. You'll need to edit the machine name of your project, the human readable name of the project, and the menu path for the custom configuration page.
-  define('PROJECT_NAME', 'changeme');
-  define('PROJECT_LABEL', 'Change Me');
-  define('CUSTOM_CONFIG_ADMIN_PATH', 'admin/config/custom');
-
-* After you've set this up, you can install as usual (by adding this module to your project's make file.)
-
 -- USE --
 
 * As a developer, you'll need to implement some hooks to take advantage of this module. You can refer to custom_config.api.php for more information on how to do this.

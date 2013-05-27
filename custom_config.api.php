@@ -127,3 +127,40 @@ function hook_queries() {
 
   return $queries;
 }
+
+/**
+ * Define a list of forms which will be displayed on the custom config page.
+ *
+ * As a developer, you may build out some custom functionality which may have
+ * custom global settings. For example, your custom module might display a
+ * really cool message on the homepage. You don't want to hard code this
+ * message, and you want a site admin to be able to easily update the cool
+ * message. You could use hook_menu and define your own path to the settings
+ * form... but, where in the menu path will you put it? What if another
+ * developer on the project has already created a path for settings? What if
+ * you want to make it as easy as possible for the site admin to customize
+ * their site?
+ *
+ * That's what this hook is for. No need to worry about where in the path the
+ * the settings will live. As long as other developers are using this hook,
+ * everyone's on the same page... and your site admin will also be on the same
+ * page. Which means, they'll have to do less hunting around the backend to
+ * find settings.
+ *
+ * This hook gets called on the custom config for admin page, which by default
+ * is set to 'admin/config/custom'.
+ *
+ * @return
+ *   A keyed array in the form of:
+ *   array(
+ *     'form_id' => t('Title'),
+ *     'homepage_settings_form' => t('Homepage Settings'),
+ *   )
+ */
+function hook_custom_config_forms() {
+  // Return an array of form IDs and Titles.
+  return array(
+    //'form_id' => t('Title'),
+    'homepage_settings_form' => t('Homepage Settings'),
+  );
+}

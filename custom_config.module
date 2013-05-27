@@ -6,50 +6,44 @@
  */
 
 /**
- * Project machine name.
- */
-define('PROJECT_NAME', 'changeme');
-
-/**
- * Project label.
- */
-define('PROJECT_LABEL', 'Change Me');
-
-/**
- * Config admin path.
- */
-define('CUSTOM_CONFIG_ADMIN_PATH', 'admin/config/custom');
-
-
-/**
  * Implements hook_menu().
  */
 function custom_config_menu() {
   $items = array();
 
-  $items[CUSTOM_CONFIG_ADMIN_PATH] = array(
-    'title' => PROJECT_LABEL,
+  // Config path for site admins.
+  $items[variable_get('custom_config_admin_path', 'admin/config/custom')] = array(
+    'title' => variable_get('custom_config_project_label', variable_get('site_name', 'Custom Config')),
     'page callback' => 'custom_config_admin_page',
     'access arguments' => array('access custom config'),
     'file' => 'custom_config.admin.inc',
   );
-  $items[CUSTOM_CONFIG_ADMIN_PATH . '/info'] = array(
-    'title' => PROJECT_LABEL . ' - Info',
+
+  // Config pages.
+  $items['admin/config/development/custom_config'] = array(
+    'title' => 'Custom Config Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('custom_config_settings_form'),
+    'access arguments' => array('admin custom config'),
+    'file' => 'custom_config.admin.inc',
+  );
+  $items['admin/config/development/custom_config/info'] = array(
+    'title' => 'Custom Config Settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-  $items[CUSTOM_CONFIG_ADMIN_PATH . '/run-install-hooks'] = array(
+  $items['admin/config/development/custom_config/run-install-hooks'] = array(
     'title' => 'Run Install Hooks',
     'type' => MENU_LOCAL_TASK,
     'page callback' => 'custom_config_install_callback',
-    'access arguments' => array('access custom config'),
+    'access arguments' => array('admin custom config'),
     'file' => 'custom_config.admin.inc',
   );
-  $items[CUSTOM_CONFIG_ADMIN_PATH . '/run-post-install'] = array(
+  $items['admin/config/development/custom_config/run-post-install'] = array(
     'title' => 'Run Post Install',
     'type' => MENU_LOCAL_TASK,
     'page callback' => 'custom_config_postinstall_callback',
-    'access arguments' => array('access custom config'),
+    'access arguments' => array('admin custom config'),
     'file' => 'custom_config.admin.inc',
   );
 
@@ -63,6 +57,9 @@ function custom_config_permission() {
   $permissions = array(
     'access custom config' => array(
       'title' => t('Access Custom Config'),
+    ),
+    'admin custom config' => array(
+      'title' => t('Admin Custom Config Settings'),
     ),
   );
   return $permissions;
@@ -185,6 +182,8 @@ function custom_config_module_implements($hook) {
     return array();
   }
 
+  $project_name = variable_get('custom_config_project_name', 'custom_config');
+
   // Start the query on the system table.
   $query = db_select('system', 's')
           ->fields('s', array('name'));
@@ -192,7 +191,7 @@ function custom_config_module_implements($hook) {
   $or = db_or()
       ->condition('s.filename', '%modules/custom%', 'LIKE')
       ->condition('s.filename', '%modules/features%', 'LIKE')
-      ->condition('s.filename', 'profiles/' . PROJECT_NAME . '/' . PROJECT_NAME . '.profile', 'LIKE');
+      ->condition('s.filename', 'profiles/' . $project_name . '/' . $project_name . '.profile', 'LIKE');
   $query->condition($or);
   // Also if it's one of the modules that implement the hook.
   $query->condition('s.name', $modules);
@@ -222,7 +221,7 @@ function custom_config_create_blocks($blocks) {
   foreach ($blocks as $i => $block) {
     // Add defaults.
     $block += array(
-      'theme' => PROJECT_NAME,
+      'theme' => variable_get('custom_config_project_name', 'custom_config'),
       'visibility' => 0,
       'pages' => '',
       'cache' => -1,
@@ -285,7 +284,7 @@ function custom_config_try_query($query) {
   catch (Exception $e) {
     // If it failed, rollback and throw an error.
     $transaction->rollback();
-    watchdog_exception(PROJECT_NAME, $e);
+    watchdog_exception(variable_get('custom_config_project_name', 'custom_config'), $e);
   }
   // If we've gotten this far, then the query will be commited.
 }
@@ -328,17 +327,6 @@ function custom_config_create_terms($vocab_name, $terms) {
 }
 
 /**
- * Safely install a module/feature's components.
- *
- * @param string $module
- *   The module which needs to be installed.
- */
-function custom_config_install_module($module) {
-  // During a module's installation... maybe we need to do things?
-
-}
-
-/**
  * Enable modules, one at a time.
  *
  * We do this to gather better debug info and
@@ -375,7 +363,7 @@ function custom_config_module_enable($module_list) {
   }
 
   // Watchdog the info!
-  watchdog(PROJECT_NAME, 'The following modules were enabled: @enabled
+  watchdog(variable_get('custom_config_project_name', 'custom_config'), 'The following modules were enabled: @enabled
     <br /><br />
     The following modules were not enabled because one or more dependencies
     are missing for that module: @not_enabled',

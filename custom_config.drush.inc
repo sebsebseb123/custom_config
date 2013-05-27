@@ -11,11 +11,11 @@
 function custom_config_drush_command() {
   $items['custom_config-run-install-hooks'] = array(
     'description' => 'Run install hooks for our custom and feature modules.',
-    'aliases' => array('cc-ri'),
+    'aliases' => array('cusri'),
   );
   $items['custom_config-run-postinstall-hooks'] = array(
     'description' => 'Run post-install hooks for our custom and feature modules.',
-    'aliases' => array('cc-rpi'),
+    'aliases' => array('cusrp'),
   );
   return $items;
 }
