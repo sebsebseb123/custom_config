@@ -21,7 +21,7 @@ function custom_config_admin_page() {
     foreach ($forms as $form_id => $title) {
       $output[$form_id . '_fieldset'] = array(
         '#type' => 'fieldset',
-        '#title' => t($title),
+        '#title' => $title,
       );
       $output[$form_id . '_fieldset'][$form_id] = drupal_get_form($form_id);
     }
