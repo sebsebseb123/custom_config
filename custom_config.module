@@ -15,7 +15,7 @@ function custom_config_menu() {
   $items[variable_get('custom_config_admin_path', 'admin/config/custom')] = array(
     'title' => variable_get('custom_config_project_label', variable_get('site_name', 'Custom Config')),
     'page callback' => 'custom_config_admin_page',
-    'access arguments' => array('access custom config'),
+    'access callback' => 'custom_config_admin_forms_access',
     'file' => 'custom_config.admin.inc',
   );
 
@@ -63,6 +63,35 @@ function custom_config_permission() {
     ),
   );
   return $permissions;
+}
+
+/**
+ * Check whether the user has access to any of the forms on the custom config
+ * admin page.
+ */
+function custom_config_admin_forms_access() {
+  $forms = module_invoke_all('custom_config_forms');
+
+  $info_defaults = array(
+    'access callback' => 'user_access',
+    'access arguments' => array('access custom config'),
+  );
+
+  foreach ($forms as $form_id => $form_info) {
+    if (!is_array($form_info)) {
+      // Backwards compatability for forms with only the title specified.
+      $form_info = array(
+        'title' => $form_info
+      );
+    }
+    $form_info += $info_defaults;
+    $access = call_user_func_array($form_info['access callback'], $form_info['access arguments']);
+
+    if ($access) {
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 
 /**
