@@ -151,16 +151,28 @@ function hook_queries() {
  * is set to 'admin/config/custom'.
  *
  * @return
- *   A keyed array in the form of:
+ *   An array keyed by the form ids to include on the page.  The value can
+ *   either be just a title for the form, or an array of options.
+ *   By default, any user with the 'Access Custom Config' permission can edit
+ *   any forms specified.  This can be overriden by specifying an alternate
+ *   callback function or arguments.  If a callback function is not specified,
+ *   it will default to `user_access()`.
  *   array(
  *     'form_id' => t('Title'),
- *     'homepage_settings_form' => t('Homepage Settings'),
+ *     'homepage_settings_form' => array(
+ *       'title' => t('Homepage Settings'),
+ *       'access callback' => 'user_access',
+ *       'access arguments' => array('access custom config'),
  *   )
  */
 function hook_custom_config_forms() {
   // Return an array of form IDs and Titles.
   return array(
-    //'form_id' => t('Title'),
-    'homepage_settings_form' => t('Homepage Settings'),
+    'form_id' => t('Title'),
+    'homepage_settings_form' => array(
+      'title' => t('Homepage Settings'),
+      'access callback' => 'user_access',
+      'access arguments' => array('access custom config'),
+    ),
   );
 }
