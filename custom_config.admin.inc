@@ -15,16 +15,33 @@ function custom_config_admin_page() {
 
   // Find all custom config forms.
   // Create any blocks that we need to.
-  foreach (custom_config_module_implements('custom_config_forms') as $module) {
-    $forms = module_invoke($module, 'custom_config_forms');
+  $forms = module_invoke_all('custom_config_forms');
 
-    foreach ($forms as $form_id => $title) {
-      $output[$form_id . '_fieldset'] = array(
-        '#type' => 'fieldset',
-        '#title' => $title,
+  $info_defaults = array(
+    'access callback' => 'user_access',
+    'access arguments' => array('access custom config'),
+  );
+
+  foreach ($forms as $form_id => $form_info) {
+
+    if (!is_array($form_info)) {
+      // Backwards compatability for forms with only the title specified.
+      $form_info = array(
+        'title' => $form_info
       );
-      $output[$form_id . '_fieldset'][$form_id] = drupal_get_form($form_id);
     }
+    $form_info += $info_defaults;
+    $access = call_user_func_array($form_info['access callback'], $form_info['access arguments']);
+
+    if (!$access) {
+      continue;
+    }
+
+    $output[$form_id . '_fieldset'] = array(
+      '#type' => 'fieldset',
+      '#title' => $form_info['title'],
+    );
+    $output[$form_id . '_fieldset'][$form_id] = drupal_get_form($form_id);
   }
 
   // If we have no settings... lets say something so we don't have
