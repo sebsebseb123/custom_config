@@ -95,29 +95,6 @@ function custom_config_admin_forms_access() {
 }
 
 /**
- * Implements hook_init().
- *
- * We use this instead of an install hook because we need to do some
- * actions after the entire site is fully built.
- */
-function custom_config_init() {
-  // If this is the very first page hit... we need to do stuff.
-  // TODO: Would be nice to have a supplementary module which turns itself
-  // off after the first init. For the sole purpose of this type of install
-  // functionality. That way, hook_init isn't called every time.
-  if (variable_get('custom_config_ran', FALSE)) {
-    return;
-  }
-
-  // Set var, so that this hook will never run.
-  variable_set('custom_config_ran', TRUE);
-
-  // Call function to run post install routines.
-  module_load_include('inc', 'custom_config', 'custom_config.admin');
-  custom_config_postinstall_callback();
-}
-
-/**
  * Fire the install hooks of our custom and feature modules.
  */
 function custom_config_run_install_hooks() {
