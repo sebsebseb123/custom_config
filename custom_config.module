@@ -310,21 +310,25 @@ function custom_config_create_terms($vocab_name, $terms) {
     return;
   }
 
-  foreach ($terms as $term_name) {
+  foreach ($terms as $term_data) {
+    if (is_string($term_data)) {
+      $term_data = array(
+        'name' => $term_data,
+      );
+    }
     // Try to find any matches for this term name.
-    $matches = taxonomy_get_term_by_name($term_name, $vocab->machine_name);
+    $matches = taxonomy_get_term_by_name($term_data['name'], $vocab->machine_name);
 
     // If none, let's create it.
     if (empty($matches)) {
       // Add vocab ID and a default weight.
-      $term = array(
-        'name' => $term_name,
+      $term_data += array(
         'vid' => $vocab->vid,
         'weight' => 0,
       );
 
       // Make it an object.
-      $term = (object) $term;
+      $term = (object) $term_data;
 
       // Save it.
       taxonomy_term_save($term);
