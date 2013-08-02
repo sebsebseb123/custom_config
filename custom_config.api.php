@@ -66,6 +66,22 @@ function hook_install_terms() {
       'ducks',
       'stapler',
     ),
+
+    // Additional term properties can be specified by using an array
+    'status' => array(
+      array(
+        'name' => 'New',
+        'weight' => -10,
+      ),
+      array(
+        'name' => 'In Review',
+        'weight' => 0,
+      ),
+      array(
+        'name' => 'Approved',
+        'weight' => 10,
+      ),
+    ),
   );
 }
 
